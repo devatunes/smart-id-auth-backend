@@ -60,4 +60,4 @@ class AuthMetrics(BaseModel):
     rejected: int
     approvalRate: float
     rejectionRate: float
-    rejectionReasons: Dict[str, int]  # ejemplo: {"Liveness low": 4, "Document invalid": 2}
+    rejectionReasons: dict[str, int]  # ejemplo: {"Liveness low": 4, "Document invalid": 2}
