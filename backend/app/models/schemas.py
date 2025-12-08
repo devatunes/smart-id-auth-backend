@@ -46,3 +46,10 @@ class LivenessResult(BaseModel):
     score: float                 # 0.0 a 1.0
     isLive: bool                 # True si se considera persona real
     reason: Optional[str] = None # Texto corto explicando el resultado
+
+class DecisionResult(BaseModel):
+    sessionId: str
+    status: Literal["APPROVED", "REJECTED"]
+    reason: Optional[str] = None
+    livenessScore: Optional[float] = None
+    documentValid: Optional[bool] = None

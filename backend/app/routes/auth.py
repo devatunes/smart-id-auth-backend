@@ -6,6 +6,7 @@ from app.models.schemas import (
     DocumentOcrResult,
     DocumentValidationResult,
     LivenessResult,
+    DecisionResult,
 )
 from app.services.session_service import create_session, get_session
 from app.services.ocr_service import analyze_document_ocr
@@ -141,3 +142,67 @@ async def upload_selfie(
         "message": "Selfie received and liveness analyzed (stub)",
         "liveness": liveness_result,
     }
+    
+@router.post("/decision", response_model=DecisionResult)
+def finalize_decision(sessionId: str):
+    """
+    Toma la decisión final de autenticación basada en:
+    - Validación del documento
+    - Liveness score
+    - Estado de la sesión
+    """
+
+    session = get_session(sessionId)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # 1. Validar que el documento y selfie hayan sido recibidos
+    if not session.documentProcessed:
+        session.status = "REJECTED"
+        session.rejectReason = "Document not processed"
+        return DecisionResult(
+            sessionId=sessionId,
+            status="REJECTED",
+            reason=session.rejectReason,
+            livenessScore=session.livenessScore,
+            documentValid=False,
+        )
+
+    if not session.selfieProcessed:
+        session.status = "REJECTED"
+        session.rejectReason = "Selfie not processed"
+        return DecisionResult(
+            sessionId=sessionId,
+            status="REJECTED",
+            reason=session.rejectReason,
+            livenessScore=session.livenessScore,
+            documentValid=True,  # documento sí recibido
+        )
+
+    # 2. Validar OCR + documento (mock por ahora)
+    # Por ahora contamos como válido cualquier documento no rechazado previamente
+    document_valid = True  # en pasos posteriores esto vendrá de la validación real
+
+    # 3. Validar liveness
+    if session.livenessScore is None or session.livenessScore < 0.8:
+        session.status = "REJECTED"
+        session.rejectReason = "Liveness score too low"
+        return DecisionResult(
+            sessionId=sessionId,
+            status="REJECTED",
+            reason=session.rejectReason,
+            livenessScore=session.livenessScore,
+            documentValid=document_valid,
+        )
+
+    # 4. Si todo está OK → aprobación
+    session.status = "APPROVED"
+    session.rejectReason = None
+
+    return DecisionResult(
+        sessionId=sessionId,
+        status="APPROVED",
+        reason=None,
+        livenessScore=session.livenessScore,
+        documentValid=document_valid,
+    )
