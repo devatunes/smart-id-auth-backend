@@ -26,10 +26,11 @@ class AuthSession(BaseModel):
 class DocumentOcrResult(BaseModel):
     """
     Resultado del OCR sobre el documento de identidad.
-    Esto es lo que más adelante llenará EasyOCR/Tesseract.
+    Esto es lo que más adelante llenará EasyOCR
     """
     documentNumber: str
-    fullName: str
+    givenNames: Optional[str] = None   # NOMBRES
+    surnames: Optional[str] = None     # APELLIDOS
     expiryDate: Optional[str] = None
     ocrConfidence: float
     captureQuality: Literal["GOOD", "BLURRY", "PARTIAL", "OUT_OF_FRAME"]

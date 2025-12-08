@@ -18,10 +18,10 @@ _DOCUMENTS: Dict[str, DocumentRecord] = {
         expiryDate="2030-12-31",
         isActive=True,
     ),
-    "987654321": DocumentRecord(
-        documentNumber="987654321",
-        fullName="OTRO NOMBRE MOCK",
-        expiryDate="2028-05-10",
+    "1082997388": DocumentRecord(
+        documentNumber="1082997388",
+        fullName="ALVARO LUIS RODRIGUEZ ATUNEZ",
+        expiryDate="2030-12-31",
         isActive=True,
     ),
     # Puedes agregar más registros para pruebas.
