@@ -5,10 +5,12 @@ from app.models.schemas import (
     StartAuthResponse,
     DocumentOcrResult,
     DocumentValidationResult,
+    LivenessResult,
 )
 from app.services.session_service import create_session, get_session
 from app.services.ocr_service import analyze_document_ocr
 from app.services.document_repository import get_document
+from app.services.liveness_service import analyze_liveness
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -94,4 +96,48 @@ async def upload_document(
         "message": "Document received and processed (OCR + validation stub)",
         "ocrResult": ocr_result,
         "validation": validation,
+    }
+    
+@router.post("/selfie")
+async def upload_selfie(
+    sessionId: str,
+    file: UploadFile = File(...),
+):
+    """
+    Recibe la selfie asociada a una sesión de autenticación
+    y ejecuta un análisis de liveness (por ahora stub).
+    """
+
+    # 1. Validar que la sesión exista
+    session = get_session(sessionId)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    # 2. Validar tipo de archivo básico
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only image files are allowed.",
+        )
+
+    # 3. Ejecutar liveness (stub)
+    liveness_result: LivenessResult = await analyze_liveness(file)
+
+    # 4. Actualizar sesión
+    session.selfieProcessed = True
+    session.livenessScore = liveness_result.score
+
+    # 5. (Más adelante) Aquí conectaremos:
+    #    - face match con el rostro del documento
+    #    - decisiones de aprobación/rechazo usando livenessScore, OCR, etc.
+
+    return {
+        "sessionId": session.sessionId,
+        "filename": file.filename,
+        "contentType": file.content_type,
+        "message": "Selfie received and liveness analyzed (stub)",
+        "liveness": liveness_result,
     }
