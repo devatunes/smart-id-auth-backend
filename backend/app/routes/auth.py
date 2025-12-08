@@ -1,9 +1,14 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, status
 import uuid
 
-from app.models.schemas import StartAuthResponse, DocumentOcrResult
+from app.models.schemas import (
+    StartAuthResponse,
+    DocumentOcrResult,
+    DocumentValidationResult,
+)
 from app.services.session_service import create_session, get_session
 from app.services.ocr_service import analyze_document_ocr
+from app.services.document_repository import get_document
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -20,6 +25,13 @@ def start_authentication():
         message="Authentication session started",
         createdAt=session.createdAt,
     )
+    
+@router.get("/session-debug")
+def session_debug(sessionId: str):
+    session = get_session(sessionId)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @router.post("/document")
@@ -29,7 +41,7 @@ async def upload_document(
 ):
     """
     Recibe la imagen del documento asociada a una sesión,
-    ejecuta OCR (por ahora mock) y marca la sesión como procesada.
+    ejecuta OCR (por ahora mock) y valida el documento contra el repositorio local.
     """
 
     # 1. Validar que la sesión exista
@@ -50,24 +62,36 @@ async def upload_document(
     # 3. Ejecutar OCR (mock por ahora)
     ocr_result: DocumentOcrResult = await analyze_document_ocr(file)
 
-    # 4. Marcar en la sesión que ya se procesó el documento
+    # 4. Validar documento contra el repositorio local
+    record = get_document(ocr_result.documentNumber)
+
+    if record is None:
+        validation = DocumentValidationResult(
+            isValid=False,
+            reason="Document not found in local repository",
+        )
+    else:
+        # Aquí podríamos validar expiración, estado, etc.
+        if record.isActive:
+            validation = DocumentValidationResult(
+                isValid=True,
+                reason=None,
+            )
+        else:
+            validation = DocumentValidationResult(
+                isValid=False,
+                reason="Document is inactive",
+            )
+
+    # 5. Marcar en la sesión que ya se procesó el documento
     session.documentProcessed = True
-    # Más adelante podremos guardar en la sesión:
-    # session.ocrConfidence = ocr_result.ocrConfidence
-    # session.captureQuality = ocr_result.captureQuality
-    # etc.
+    # Más adelante podemos guardar isValid/reason dentro de la sesión también.
 
     return {
         "sessionId": session.sessionId,
         "filename": file.filename,
         "contentType": file.content_type,
-        "message": "Document received and processed (OCR stub)",
+        "message": "Document received and processed (OCR + validation stub)",
         "ocrResult": ocr_result,
+        "validation": validation,
     }
-    
-@router.get("/session-debug")
-def session_debug(sessionId: str):
-    session = get_session(sessionId)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session

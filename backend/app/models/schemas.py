@@ -33,3 +33,7 @@ class DocumentOcrResult(BaseModel):
     expiryDate: Optional[str] = None
     ocrConfidence: float
     captureQuality: Literal["GOOD", "BLURRY", "PARTIAL", "OUT_OF_FRAME"]
+    
+class DocumentValidationResult(BaseModel):
+    isValid: bool
+    reason: Optional[str] = None
