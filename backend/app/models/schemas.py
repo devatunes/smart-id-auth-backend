@@ -22,3 +22,14 @@ class AuthSession(BaseModel):
     livenessScore: Optional[float] = None
     faceMatchScore: Optional[float] = None
     rejectReason: Optional[str] = None
+    
+class DocumentOcrResult(BaseModel):
+    """
+    Resultado del OCR sobre el documento de identidad.
+    Esto es lo que más adelante llenará EasyOCR/Tesseract.
+    """
+    documentNumber: str
+    fullName: str
+    expiryDate: Optional[str] = None
+    ocrConfidence: float
+    captureQuality: Literal["GOOD", "BLURRY", "PARTIAL", "OUT_OF_FRAME"]
