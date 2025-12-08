@@ -266,3 +266,4 @@ def _extract_name_parts_from_results(
         given_names = best_given
 
     return given_names, surnames
+
