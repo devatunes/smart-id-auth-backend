@@ -7,8 +7,14 @@ from app.models.schemas import (
     DocumentValidationResult,
     LivenessResult,
     DecisionResult,
+    AuthMetrics,
 )
-from app.services.session_service import create_session, get_session
+
+from app.services.session_service import (
+    create_session,
+    get_session,
+    get_all_sessions,
+)
 from app.services.ocr_service import analyze_document_ocr
 from app.services.document_repository import get_document
 from app.services.liveness_service import analyze_liveness
@@ -205,4 +211,44 @@ def finalize_decision(sessionId: str):
         reason=None,
         livenessScore=session.livenessScore,
         documentValid=document_valid,
+    )
+    
+@router.get("/metrics", response_model=AuthMetrics)
+def get_auth_metrics():
+    """
+    Devuelve métricas globales de autenticación:
+    - total de sesiones
+    - aprobadas
+    - rechazadas
+    - % aprobación / rechazo
+    - razones de rechazo agrupadas
+    """
+
+    sessions = get_all_sessions()
+    total = len(sessions)
+
+    approved = 0
+    rejected = 0
+    rejection_reasons = {}
+
+    for session in sessions.values():
+        if session.status == "APPROVED":
+            approved += 1
+        elif session.status == "REJECTED":
+            rejected += 1
+            if session.rejectReason:
+                rejection_reasons[session.rejectReason] = (
+                    rejection_reasons.get(session.rejectReason, 0) + 1
+                )
+
+    approval_rate = (approved / total) * 100 if total > 0 else 0
+    rejection_rate = (rejected / total) * 100 if total > 0 else 0
+
+    return AuthMetrics(
+        totalSessions=total,
+        approved=approved,
+        rejected=rejected,
+        approvalRate=approval_rate,
+        rejectionRate=rejection_rate,
+        rejectionReasons=rejection_reasons,
     )

@@ -53,3 +53,11 @@ class DecisionResult(BaseModel):
     reason: Optional[str] = None
     livenessScore: Optional[float] = None
     documentValid: Optional[bool] = None
+    
+class AuthMetrics(BaseModel):
+    totalSessions: int
+    approved: int
+    rejected: int
+    approvalRate: float
+    rejectionRate: float
+    rejectionReasons: Dict[str, int]  # ejemplo: {"Liveness low": 4, "Document invalid": 2}
