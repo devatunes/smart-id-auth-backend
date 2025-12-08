@@ -54,6 +54,24 @@ async def analyze_document_ocr(file: UploadFile) -> DocumentOcrResult:
         ocrConfidence=avg_conf,
         captureQuality=capture_quality,
     )
+    
+def _estimate_capture_quality(avg_conf: float, results_len: int) -> str:
+    """
+    Estima una calidad de captura simple usando:
+    - confianza OCR promedio
+    - cantidad de bloques de texto detectados
+    """
+
+    if results_len == 0:
+        return "OUT_OF_FRAME"
+
+    if avg_conf < 0.4:
+        return "BLURRY"
+
+    if results_len < 3:
+        return "PARTIAL"
+
+    return "GOOD"
 
 
 def _normalize(text: str) -> str:
@@ -120,79 +138,84 @@ def _extract_name_parts_from_results(
     results: List[Tuple], full_text: str
 ) -> tuple[Optional[str], Optional[str]]:
     """
-    Extrae (givenNames, surnames) usando:
-    1) Vecindad de etiquetas APELLIDOS / NOMBRES.
-    2) Heurística sobre líneas en mayúsculas sin dígitos.
+    Extrae (givenNames, surnames):
+
+    1) Primero busca líneas cercanas a las etiquetas APELLIDOS / NOMBRES,
+       pero asumiendo que el valor está ARRIBA de la etiqueta (como en tu cédula).
+    2) Si no encuentra algo claro, usa heurística sobre líneas en mayúscula.
     """
     import re
 
     lines = [l.strip() for l in full_text.splitlines() if l.strip()]
-
-    # -------- 1) Intento basado en etiquetas APELLIDOS / NOMBRES --------
-    surnames = None
-    given_names = None
-
     norm_lines = [_normalize(l) for l in lines]
 
-    # Buscar apellidos
-    for idx, ln in enumerate(norm_lines):
-        if "APELLIDOS" in ln or "APELLIDO" in ln:
-            # tomar la siguiente línea con 2+ palabras, sin dígitos, en mayúsculas
-            for j in range(idx + 1, min(idx + 4, len(lines))):
-                candidate = lines[j].strip()
-                cand_norm = _normalize(candidate)
-                if not re.match(r"^[A-ZÁÉÍÓÚÑ ]+$", candidate):
-                    continue
-                if any(ch.isdigit() for ch in candidate):
-                    continue
-                if len(candidate.split()) < 2:
-                    continue
-                surnames = " ".join(candidate.split())
-                break
-            if surnames:
-                break
+    given_names: Optional[str] = None
+    surnames: Optional[str] = None
 
-    # Buscar nombres
-    for idx, ln in enumerate(norm_lines):
-        if "NOMBRES" in ln or "NOMBRE" in ln:
-            for j in range(idx + 1, min(idx + 4, len(lines))):
-                candidate = lines[j].strip()
-                cand_norm = _normalize(candidate)
-                if not re.match(r"^[A-ZÁÉÍÓÚÑ ]+$", candidate):
-                    continue
-                if any(ch.isdigit() for ch in candidate):
-                    continue
-                if len(candidate.split()) < 1:
-                    continue
-                given_names = " ".join(candidate.split())
-                break
-            if given_names:
-                break
+    # -----------------------
+    # 1️⃣ Búsqueda usando etiquetas (valores ARRIBA)
+    # -----------------------
 
-    # Si ya conseguimos ambos por contexto, devolvemos
-    if given_names or surnames:
-        return given_names, surnames
+    def pick_name_near_label(keywords: tuple[str, ...]) -> Optional[str]:
+        for idx, ln in enumerate(norm_lines):
+            if any(k in ln for k in keywords):
+                # Primero miramos ARRIBA (1 a 3 líneas antes)
+                for j in range(idx - 1, max(idx - 4, -1), -1):
+                    cand = lines[j].strip()
+                    if not re.match(r"^[A-ZÁÉÍÓÚÑ ]+$", cand):
+                        continue
+                    if any(ch.isdigit() for ch in cand):
+                        continue
+                    if len(cand.split()) >= 1:
+                        return " ".join(cand.split())
 
-    # -------- 2) Fallback heurístico usando solo líneas en mayúsculas --------
+                # Como respaldo, miramos 1–2 líneas debajo
+                for j in range(idx + 1, min(idx + 3, len(lines))):
+                    cand = lines[j].strip()
+                    if not re.match(r"^[A-ZÁÉÍÓÚÑ ]+$", cand):
+                        continue
+                    if any(ch.isdigit() for ch in cand):
+                        continue
+                    if len(cand.split()) >= 1:
+                        return " ".join(cand.split())
+        return None
+
+    # Apellidos (valor arriba de "APELLIDOS")
+    surnames = pick_name_near_label(("APELLIDOS", "APELLIDO"))
+
+    # Nombres (valor arriba de "NOMBRES")
+    given_names = pick_name_near_label(("NOMBRES", "NOMBRE"))
+
+    # Si ya obtuvimos algo razonable, devolvemos directamente
+    # Solo devolvemos directo si TENEMOS ambas partes
+    if given_names and surnames:
+      return given_names, surnames
+    # Si falta alguna, seguimos para completar usando candidatos
+
+    # -----------------------
+    # 2️⃣ Heurística general (por si no se detectan etiquetas)
+    # -----------------------
 
     BLOCK_WORDS = {
         "REPUBLICA",
         "COLOMBIA",
         "REPUBLICA DE COLOMBIA",
-        "IDENTIFICACION PERSONAL",
         "IDENTIFICACION",
         "PERSONAL",
+        "IDENTIFICACION PERSONAL",
         "CEDULA",
         "CIUDADANIA",
         "CEDULA DE CIUDADANIA",
         "NUMERO",
+        "APELLIDOS",
+        "NOMBRES",
         "FIRMA",
         "DE",
         "LA",
         "DEL",
     }
 
-    candidates = []
+    candidates: list[str] = []
     for line in lines:
         clean = line.replace(":", "").strip()
 
@@ -201,45 +224,45 @@ def _extract_name_parts_from_results(
         if any(ch.isdigit() for ch in clean):
             continue
 
-        clean = re.sub(r"\s+", " ", clean)
-
-        if _normalize(clean) in {_normalize(b) for b in BLOCK_WORDS}:
+        norm = _normalize(clean)
+        if any(b in norm for b in BLOCK_WORDS):
             continue
 
         if len(clean.split()) < 2:
             continue
 
-        candidates.append(clean)
+        candidates.append(" ".join(clean.split()))
 
     if not candidates:
-        return None, None
-
-    # Ordenamos por cantidad de palabras (la más corta suele ser apellidos)
-    candidates_sorted = sorted(candidates, key=lambda s: len(s.split()))
-
-    if len(candidates_sorted) >= 2:
-        surnames = candidates_sorted[0]
-        given_names = candidates_sorted[1]
         return given_names, surnames
 
-    only = candidates_sorted[0]
-    return only, None
+    # Clasificador simple: pinta de apellidos por sufijos
+    SURNAME_SUFFIXES = ("EZ", "ES", "NEZ", "DEZ", "TEZ", "ÑEZ", "Z")
 
+    def surname_score(line: str) -> int:
+        score = 0
+        for token in line.split():
+            t = _normalize(token)
+            for suf in SURNAME_SUFFIXES:
+                if t.endswith(suf):
+                    score += 1
+        return score
 
-def _estimate_capture_quality(avg_conf: float, results_len: int) -> str:
-    """
-    Estima una calidad de captura simple usando:
-    - confianza OCR promedio
-    - cantidad de bloques de texto detectados
-    """
+    candidates_sorted = sorted(candidates, key=surname_score, reverse=True)
 
-    if results_len == 0:
-        return "OUT_OF_FRAME"
+    best_surname = candidates_sorted[0]
+    others = candidates_sorted[1:]
 
-    if avg_conf < 0.4:
-        return "BLURRY"
+    if others:
+        best_given = sorted(others, key=lambda s: len(s.split()), reverse=True)[0]
+    else:
+        best_given = best_surname
+        best_surname = None
 
-    if results_len < 3:
-        return "PARTIAL"
+    # Rellenar solo lo que falte
+    if not surnames:
+        surnames = best_surname
+    if not given_names:
+        given_names = best_given
 
-    return "GOOD"
+    return given_names, surnames
