@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 import uuid
-from datetime import datetime
 
 from app.models.schemas import StartAuthResponse
+from app.services.session_service import create_session
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -10,10 +10,12 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/start", response_model=StartAuthResponse)
 def start_authentication():
     session_id = str(uuid.uuid4())
-    now = datetime.utcnow()
+
+    # Crear y registrar la sesión en memoria
+    session = create_session(session_id=session_id)
 
     return StartAuthResponse(
-        sessionId=session_id,
+        sessionId=session.sessionId,
         message="Authentication session started",
-        createdAt=now,
+        createdAt=session.createdAt,
     )
