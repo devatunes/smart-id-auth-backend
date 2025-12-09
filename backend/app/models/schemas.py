@@ -12,38 +12,32 @@ class StartAuthResponse(BaseModel):
 class AuthSession(BaseModel):
     """
     Representa el estado de una sesión de autenticación.
-    Este modelo se usa para trazabilidad y métricas.
+    Usada para trazabilidad y decisiones.
     """
+
     sessionId: str
     createdAt: datetime
+
+    # Estado general
     status: Literal["PENDING", "APPROVED", "REJECTED"] = "PENDING"
+    rejectReason: Optional[str] = None
 
-    # Flags del flujo
+    # ---- Documento ----
     documentProcessed: bool = False
-    selfieProcessed: bool = False
-
-    # Resultados del documento
     documentValid: Optional[bool] = None
     documentValidationReason: Optional[str] = None
-
-    # OCR
     ocrConfidence: Optional[float] = None
     captureQuality: Optional[str] = None
+    documentFaceDescriptor: Optional[list[float]] = None  # FaceNet 512D
 
-    # Selfie / liveness
+    # ---- Selfie ----
+    selfieProcessed: bool = False
     livenessScore: Optional[float] = None
-
-    # (Futuro) Face match
-    faceMatchScore: Optional[float] = None
-
-    # Decisión final
-    rejectReason: Optional[str] = None
-    
     livenessReason: Optional[str] = None
-    
-    # Descriptores faciales para comparación
-    documentFaceDescriptor: Optional[list[float]] = None
     selfieFaceDescriptor: Optional[list[float]] = None
+
+    # ---- Face match ----
+    faceMatchScore: Optional[float] = None
     
 class DocumentOcrResult(BaseModel):
     """
@@ -71,10 +65,12 @@ class DecisionResult(BaseModel):
     sessionId: str
     status: Literal["APPROVED", "REJECTED"]
     reason: Optional[str] = None
+
     documentValid: Optional[bool] = None
     documentValidationReason: Optional[str] = None
     ocrConfidence: Optional[float] = None
     captureQuality: Optional[str] = None
+
     livenessScore: Optional[float] = None
     faceMatchScore: Optional[float] = None
     

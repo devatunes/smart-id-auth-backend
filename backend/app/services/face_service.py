@@ -36,25 +36,15 @@ def _bytes_to_pil(image_bytes: bytes) -> Optional[Image.Image]:
     Convierte bytes a una imagen PIL en RGB.
     Devuelve None si no se puede decodificar.
     """
+    import io
+
     try:
-        img = Image.open(
-            # BytesIO implícito dentro de PIL
-            # pero para mayor claridad podrías usar io.BytesIO
-            # aquí PIL se encarga del buffer interno
-            image_bytes  # type: ignore[arg-type]
-        )
+        img = Image.open(io.BytesIO(image_bytes))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        return img
     except Exception:
-        # Fallback explícito con BytesIO por compatibilidad
-        import io
-
-        try:
-            img = Image.open(io.BytesIO(image_bytes))
-        except Exception:
-            return None
-
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    return img
+        return None
 
 
 def extract_face_descriptor(image_bytes: bytes) -> Optional[List[float]]:

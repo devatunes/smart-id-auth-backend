@@ -159,8 +159,8 @@ async def analyze_liveness(file: UploadFile) -> LivenessResult:
     final_score = float(max(0.0, min(1.0, final_score)))
 
     # Umbral de liveness un poco más exigente
-    threshold = 0.8
-    is_live = final_score >= threshold
+    LIVENESS_THRESHOLD = 0.75
+    is_live = final_score >= LIVENESS_THRESHOLD
 
     if is_live:
         reason = None
