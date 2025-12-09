@@ -23,7 +23,7 @@ from app.helpers.session_helper import SessionNotFoundError
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/start", response_model=StartAuthResponse)
+@router.post("/session", response_model=StartAuthResponse)
 def start_authentication():
     """
     Crea una nueva sesión de autenticación y la devuelve al cliente.

@@ -12,15 +12,31 @@ class StartAuthResponse(BaseModel):
 class AuthSession(BaseModel):
     """
     Representa el estado de una sesión de autenticación.
-    Este modelo se usará para trazabilidad y métricas.
+    Este modelo se usa para trazabilidad y métricas.
     """
     sessionId: str
     createdAt: datetime
     status: Literal["PENDING", "APPROVED", "REJECTED"] = "PENDING"
+
+    # Flags del flujo
     documentProcessed: bool = False
     selfieProcessed: bool = False
+
+    # Resultados del documento
+    documentValid: Optional[bool] = None
+    documentValidationReason: Optional[str] = None
+
+    # OCR
+    ocrConfidence: Optional[float] = None
+    captureQuality: Optional[str] = None
+
+    # Selfie / liveness
     livenessScore: Optional[float] = None
+
+    # (Futuro) Face match
     faceMatchScore: Optional[float] = None
+
+    # Decisión final
     rejectReason: Optional[str] = None
     
 class DocumentOcrResult(BaseModel):
