@@ -81,7 +81,6 @@ async def analyze_liveness(file: UploadFile) -> LivenessResult:
     reason = None if is_live else "Liveness score below threshold"
 
     return LivenessResult(
-      
         score=score,
         isLive=is_live,
         reason=reason,
