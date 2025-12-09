@@ -1,11 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+# app/routes/auth.py
+
+from fastapi import APIRouter, UploadFile, File, HTTPException
 import uuid
 
 from app.models.schemas import (
     StartAuthResponse,
-    DocumentOcrResult,
-    DocumentValidationResult,
-    LivenessResult,
     DecisionResult,
     AuthMetrics,
 )
@@ -13,17 +12,22 @@ from app.models.schemas import (
 from app.services.session_service import (
     create_session,
     get_session,
-    get_all_sessions,
 )
-from app.services.ocr_service import analyze_document_ocr
-from app.services.document_repository import get_document
-from app.services.liveness_service import analyze_liveness
+from app.services.document_service import process_document_for_session
+from app.services.selfie_service import process_selfie_for_session
+from app.services.decision_service import evaluate_authentication
+# from app.services.metrics_service import compute_auth_metrics
+from app.helpers.image_helper import InvalidImageError
+from app.helpers.session_helper import SessionNotFoundError
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/start", response_model=StartAuthResponse)
 def start_authentication():
+    """
+    Crea una nueva sesión de autenticación y la devuelve al cliente.
+    """
     session_id = str(uuid.uuid4())
 
     # Crear y registrar la sesión en memoria
@@ -34,9 +38,14 @@ def start_authentication():
         message="Authentication session started",
         createdAt=session.createdAt,
     )
-    
+
+
 @router.get("/session-debug")
 def session_debug(sessionId: str):
+    """
+    Endpoint de apoyo para ver el estado crudo de una sesión.
+    (solo para debugging / demo).
+    """
     session = get_session(sessionId)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -49,62 +58,34 @@ async def upload_document(
     file: UploadFile = File(...),
 ):
     """
-    Recibe la imagen del documento asociada a una sesión,
-    ejecuta OCR (por ahora mock) y valida el documento contra el repositorio local.
+    Recibe la imagen del documento asociada a una sesión
+    y delega el flujo completo al document_service:
+      - validación de sesión
+      - validación de imagen
+      - OCR
+      - validación contra repositorio local
+      - actualización de sesión
     """
 
-    # 1. Validar que la sesión exista
-    session = get_session(sessionId)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found",
-        )
-
-    # 2. Validar tipo de archivo básico
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file type. Only image files are allowed.",
-        )
-
-    # 3. Ejecutar OCR (mock por ahora)
-    ocr_result: DocumentOcrResult = await analyze_document_ocr(file)
-
-    # 4. Validar documento contra el repositorio local
-    record = get_document(ocr_result.documentNumber)
-
-    if record is None:
-        validation = DocumentValidationResult(
-            isValid=False,
-            reason="Document not found in local repository",
-        )
-    else:
-        # Aquí podríamos validar expiración, estado, etc.
-        if record.isActive:
-            validation = DocumentValidationResult(
-                isValid=True,
-                reason=None,
-            )
-        else:
-            validation = DocumentValidationResult(
-                isValid=False,
-                reason="Document is inactive",
-            )
-
-    # 5. Marcar en la sesión que ya se procesó el documento
-    session.documentProcessed = True
-    # Más adelante podemos guardar isValid/reason dentro de la sesión también.
+    try:
+        result = await process_document_for_session(sessionId, file)
+    except InvalidImageError as e:
+        # Archivo no es una imagen válida
+        raise HTTPException(status_code=400, detail=str(e))
+    except SessionNotFoundError:
+        # La sesión no existe
+        raise HTTPException(status_code=404, detail="Session not found")
 
     return {
-        "sessionId": session.sessionId,
+        "sessionId": sessionId,
         "filename": file.filename,
         "contentType": file.content_type,
-        "message": "Document received and processed (OCR + validation stub)",
-        "ocrResult": ocr_result,
-        "validation": validation,
+        "message": "Document received and processed (OCR + validation)",
+        "ocrResult": result.ocrResult,
+        "validation": result.validation,
     }
-    
+
+
 @router.post("/selfie")
 async def upload_selfie(
     sessionId: str,
@@ -112,37 +93,22 @@ async def upload_selfie(
 ):
     """
     Recibe la selfie asociada a una sesión de autenticación
-    y ejecuta un análisis de liveness (por ahora stub).
+    y delega el flujo al selfie_service:
+      - validación de sesión
+      - validación de imagen
+      - análisis de liveness
+      - actualización de sesión
     """
 
-    # 1. Validar que la sesión exista
-    session = get_session(sessionId)
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found",
-        )
-
-    # 2. Validar tipo de archivo básico
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file type. Only image files are allowed.",
-        )
-
-    # 3. Ejecutar liveness (stub)
-    liveness_result: LivenessResult = await analyze_liveness(file)
-
-    # 4. Actualizar sesión
-    session.selfieProcessed = True
-    session.livenessScore = liveness_result.score
-
-    # 5. (Más adelante) Aquí conectaremos:
-    #    - face match con el rostro del documento
-    #    - decisiones de aprobación/rechazo usando livenessScore, OCR, etc.
+    try:
+        liveness_result = await process_selfie_for_session(sessionId, file)
+    except InvalidImageError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except SessionNotFoundError:
+        raise HTTPException(status_code=404, detail="Session not found")
 
     return {
-        "sessionId": session.sessionId,
+        "sessionId": sessionId,
         "filename": file.filename,
         "contentType": file.content_type,
         "message": "Selfie received and liveness analyzed (heuristic CV model)",
@@ -153,103 +119,25 @@ async def upload_selfie(
 @router.post("/decision", response_model=DecisionResult)
 def finalize_decision(sessionId: str):
     """
-    Toma la decisión final de autenticación basada en:
-    - Validación del documento
-    - Liveness score
-    - Estado de la sesión
+    Toma la decisión final de autenticación usando el decision_service:
+      - revisa flags de flujo (document/selfie procesados)
+      - valida documento, OCR y liveness
+      - actualiza el estado de la sesión (APPROVED / REJECTED)
+      - devuelve un DecisionResult con todos los detalles
     """
-
-    session = get_session(sessionId)
-    if not session:
+    try:
+        return evaluate_authentication(sessionId)
+    except SessionNotFoundError:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # 1. Validar que el documento y selfie hayan sido recibidos
-    if not session.documentProcessed:
-        session.status = "REJECTED"
-        session.rejectReason = "Document not processed"
-        return DecisionResult(
-            sessionId=sessionId,
-            status="REJECTED",
-            reason=session.rejectReason,
-            livenessScore=session.livenessScore,
-            documentValid=False,
-        )
 
-    if not session.selfieProcessed:
-        session.status = "REJECTED"
-        session.rejectReason = "Selfie not processed"
-        return DecisionResult(
-            sessionId=sessionId,
-            status="REJECTED",
-            reason=session.rejectReason,
-            livenessScore=session.livenessScore,
-            documentValid=True,  # documento sí recibido
-        )
-
-    # 2. Validar OCR + documento (mock por ahora)
-    # Por ahora contamos como válido cualquier documento no rechazado previamente
-    document_valid = True  # en pasos posteriores esto vendrá de la validación real
-
-    # 3. Validar liveness
-    if session.livenessScore is None or session.livenessScore < 0.8:
-        session.status = "REJECTED"
-        session.rejectReason = "Liveness score too low"
-        return DecisionResult(
-            sessionId=sessionId,
-            status="REJECTED",
-            reason=session.rejectReason,
-            livenessScore=session.livenessScore,
-            documentValid=document_valid,
-        )
-
-    # 4. Si todo está OK → aprobación
-    session.status = "APPROVED"
-    session.rejectReason = None
-
-    return DecisionResult(
-        sessionId=sessionId,
-        status="APPROVED",
-        reason=None,
-        livenessScore=session.livenessScore,
-        documentValid=document_valid,
-    )
-    
-@router.get("/metrics", response_model=AuthMetrics)
-def get_auth_metrics():
-    """
-    Devuelve métricas globales de autenticación:
-    - total de sesiones
-    - aprobadas
-    - rechazadas
-    - % aprobación / rechazo
-    - razones de rechazo agrupadas
-    """
-
-    sessions = get_all_sessions()
-    total = len(sessions)
-
-    approved = 0
-    rejected = 0
-    rejection_reasons = {}
-
-    for session in sessions.values():
-        if session.status == "APPROVED":
-            approved += 1
-        elif session.status == "REJECTED":
-            rejected += 1
-            if session.rejectReason:
-                rejection_reasons[session.rejectReason] = (
-                    rejection_reasons.get(session.rejectReason, 0) + 1
-                )
-
-    approval_rate = (approved / total) * 100 if total > 0 else 0
-    rejection_rate = (rejected / total) * 100 if total > 0 else 0
-
-    return AuthMetrics(
-        totalSessions=total,
-        approved=approved,
-        rejected=rejected,
-        approvalRate=approval_rate,
-        rejectionRate=rejection_rate,
-        rejectionReasons=rejection_reasons,
-    )
+# @router.get("/metrics", response_model=AuthMetrics)
+# def get_auth_metrics():
+#     """
+#     Devuelve métricas globales de autenticación usando metrics_service:
+#       - total de sesiones
+#       - aprobadas / rechazadas
+#       - tasas %
+#       - razones de rechazo agrupadas
+#     """
+#     return compute_auth_metrics()
