@@ -40,10 +40,6 @@ class DocumentValidationResult(BaseModel):
     reason: Optional[str] = None
     
 class LivenessResult(BaseModel):
-    """
-    Resultado del análisis de liveness / anti-spoofing.
-    Más adelante esto vendrá de un modelo real (parpadeo, acercamiento, etc.).
-    """
     score: float                 # 0.0 a 1.0
     isLive: bool                 # True si se considera persona real
     reason: Optional[str] = None # Texto corto explicando el resultado

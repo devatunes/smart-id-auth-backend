@@ -145,10 +145,11 @@ async def upload_selfie(
         "sessionId": session.sessionId,
         "filename": file.filename,
         "contentType": file.content_type,
-        "message": "Selfie received and liveness analyzed (stub)",
+        "message": "Selfie received and liveness analyzed (heuristic CV model)",
         "liveness": liveness_result,
     }
-    
+
+
 @router.post("/decision", response_model=DecisionResult)
 def finalize_decision(sessionId: str):
     """
