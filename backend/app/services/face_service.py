@@ -1,86 +1,123 @@
 # app/services/face_service.py
 
-from typing import Optional
-import cv2
+from typing import Optional, List
+
 import numpy as np
+from PIL import Image
+import torch
+from facenet_pytorch import MTCNN, InceptionResnetV1
+
+# --------------------------------------------------------------------
+# Inicialización global (se carga una sola vez por proceso)
+# --------------------------------------------------------------------
+
+# Dispositivo: usamos CPU para ser más portables (en Mac M1 también sirve).
+_device = torch.device("cpu")
+
+# Detector de rostros + alineador
+_mtcnn = MTCNN(
+    image_size=160,
+    margin=20,
+    min_face_size=60,
+    thresholds=[0.6, 0.7, 0.7],
+    factor=0.709,
+    post_process=True,
+    device=_device,
+)
+
+# Modelo FaceNet (InceptionResnetV1 entrenado en VGGFace2)
+_resnet = InceptionResnetV1(
+    pretrained="vggface2"
+).eval().to(_device)
 
 
-def _decode_image(image_bytes: bytes) -> Optional[np.ndarray]:
+def _bytes_to_pil(image_bytes: bytes) -> Optional[Image.Image]:
     """
-    Decodifica bytes de imagen a un arreglo BGR de OpenCV.
+    Convierte bytes a una imagen PIL en RGB.
+    Devuelve None si no se puede decodificar.
     """
-    np_arr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    try:
+        img = Image.open(
+            # BytesIO implícito dentro de PIL
+            # pero para mayor claridad podrías usar io.BytesIO
+            # aquí PIL se encarga del buffer interno
+            image_bytes  # type: ignore[arg-type]
+        )
+    except Exception:
+        # Fallback explícito con BytesIO por compatibilidad
+        import io
+
+        try:
+            img = Image.open(io.BytesIO(image_bytes))
+        except Exception:
+            return None
+
+    if img.mode != "RGB":
+        img = img.convert("RGB")
     return img
 
 
-def _detect_largest_face_gray(img: np.ndarray) -> Optional[np.ndarray]:
+def extract_face_descriptor(image_bytes: bytes) -> Optional[List[float]]:
     """
-    Detecta el rostro más grande en la imagen y devuelve el recorte en escala de grises.
-    Si no se detecta rostro, devuelve None.
+    Extrae un embedding de FaceNet (512D) para el rostro principal:
+      1. Convierte bytes → PIL Image.
+      2. Usa MTCNN para detectar y alinear la cara.
+      3. Pasa la cara por InceptionResnetV1.
+      4. Normaliza el vector (L2) y lo devuelve como lista de floats.
+
+    Devuelve:
+      - Lista[float] de 512 dimensiones si encuentra rostro.
+      - None si no se detecta rostro o algo falla.
     """
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    )
-
-    faces = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(60, 60),
-    )
-
-    if len(faces) == 0:
-        return None
-
-    # Cara más grande
-    x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
-    face_gray = gray[y : y + h, x : x + w]
-    return face_gray
-
-
-def extract_face_descriptor(image_bytes: bytes) -> Optional[list[float]]:
-    """
-    Extrae un descriptor de rostro simple:
-      - detecta rostro
-      - recorta
-      - redimensiona a 64x64
-      - aplana y normaliza (L2)
-
-    Devuelve una lista de floats (vector) o None si no hay rostro.
-    """
-    img = _decode_image(image_bytes)
+    img = _bytes_to_pil(image_bytes)
     if img is None:
         return None
 
-    face_gray = _detect_largest_face_gray(img)
-    if face_gray is None:
+    # MTCNN devuelve un tensor [3, 160, 160] o None si no hay cara
+    with torch.no_grad():
+        face_tensor = _mtcnn(img)
+
+    if face_tensor is None:
         return None
 
-    face_resized = cv2.resize(face_gray, (64, 64))
-    vec = face_resized.flatten().astype("float32")
+    # Añadimos batch dimension [1, 3, 160, 160]
+    face_tensor = face_tensor.unsqueeze(0).to(_device)
+
+    with torch.no_grad():
+        embedding = _resnet(face_tensor)  # [1, 512]
+
+    vec = embedding[0].cpu().numpy().astype("float32")
     norm = np.linalg.norm(vec)
     if norm == 0.0:
         return None
 
-    vec /= norm  # normalizar
+    vec /= norm  # normalización L2
     return vec.tolist()
 
 
-def compute_face_similarity(desc1: list[float], desc2: list[float]) -> float:
+def compute_face_similarity(desc1: List[float], desc2: List[float]) -> float:
     """
-    Calcula similitud de coseno entre dos descriptores y la normaliza a [0,1].
-    0 = nada parecido, 1 = idéntico.
-    """
-    v1 = np.array(desc1, dtype="float32")
-    v2 = np.array(desc2, dtype="float32")
+    Calcula similitud de coseno entre dos embeddings FaceNet y la normaliza a [0,1]:
+      - 0.0 → nada parecido
+      - 1.0 → prácticamente idéntico
 
-    denom = float(np.linalg.norm(v1) * np.linalg.norm(v2))
-    if denom == 0.0:
+    Ambos vectores se esperan ya normalizados, pero por seguridad
+    volvemos a normalizar aquí.
+    """
+    v1 = np.asarray(desc1, dtype="float32")
+    v2 = np.asarray(desc2, dtype="float32")
+
+    # Re-normalizar por seguridad
+    n1 = np.linalg.norm(v1)
+    n2 = np.linalg.norm(v2)
+    if n1 == 0.0 or n2 == 0.0:
         return 0.0
 
-    cos_sim = float(np.dot(v1, v2) / denom)  # [-1, 1]
-    score = (cos_sim + 1.0) / 2.0            # [0, 1]
+    v1 /= n1
+    v2 /= n2
+
+    cos_sim = float(np.dot(v1, v2))  # ya están normalizados → [-1, 1]
+    score = (cos_sim + 1.0) / 2.0    # → [0, 1]
+
+    # Clamp defensivo
     return max(0.0, min(1.0, score))
