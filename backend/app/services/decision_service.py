@@ -11,6 +11,7 @@ def evaluate_authentication(session_id: str) -> DecisionResult:
     - Validación del documento
     - OCR (confianza + calidad)
     - Liveness de la selfie
+    - Face match entre rostro del documento y selfie
 
     Devuelve una decisión final y actualiza la sesión.
     Lanza SessionNotFoundError si la sesión no existe.
@@ -56,17 +57,30 @@ def evaluate_authentication(session_id: str) -> DecisionResult:
         reasons.append(f"Capture quality is {capture_quality}")
 
     # -------------------------
-    # 4) Liveness
+    # 4) Liveness (umbral 0.75)
     # -------------------------
     liveness_score: Optional[float] = getattr(session, "livenessScore", None)
+    liveness_reason: Optional[str] = getattr(session, "livenessReason", None)
 
     if liveness_score is None:
         reasons.append("Liveness not evaluated")
-    elif liveness_score < 0.7:
-        reasons.append("Liveness score too low")
+    elif liveness_score < 0.75:  # 👈 antes 0.8
+        if liveness_reason:
+            reasons.append(f"Liveness score too low: {liveness_reason}")
+        else:
+            reasons.append("Liveness score too low")
 
     # -------------------------
-    # 5) Resultado final
+    # 5) Face match
+    # -------------------------
+    face_match_score: Optional[float] = getattr(session, "faceMatchScore", None)
+
+    # Solo penalizamos si sabemos que se evaluó y fue bajo.
+    if face_match_score is not None and face_match_score < 0.7:
+        reasons.append("Face match score too low")
+
+    # -------------------------
+    # 6) Resultado final
     # -------------------------
     if len(reasons) == 0:
         status = "APPROVED"
@@ -89,4 +103,5 @@ def evaluate_authentication(session_id: str) -> DecisionResult:
         ocrConfidence=ocr_conf,
         captureQuality=capture_quality,
         livenessScore=liveness_score,
+        faceMatchScore=face_match_score,  # 👈 importante
     )

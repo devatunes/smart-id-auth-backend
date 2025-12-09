@@ -39,6 +39,12 @@ class AuthSession(BaseModel):
     # Decisión final
     rejectReason: Optional[str] = None
     
+    livenessReason: Optional[str] = None
+    
+    # Descriptores faciales para comparación
+    documentFaceDescriptor: Optional[list[float]] = None
+    selfieFaceDescriptor: Optional[list[float]] = None
+    
 class DocumentOcrResult(BaseModel):
     """
     Resultado del OCR sobre el documento de identidad.
@@ -70,6 +76,7 @@ class DecisionResult(BaseModel):
     ocrConfidence: Optional[float] = None
     captureQuality: Optional[str] = None
     livenessScore: Optional[float] = None
+    faceMatchScore: Optional[float] = None
     
 class AuthMetrics(BaseModel):
     totalSessions: int
