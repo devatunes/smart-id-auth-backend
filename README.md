@@ -11,7 +11,7 @@
 
 ---
 
-## 📌 Enlaces importantes
+## Enlaces importantes 📌
 
 | Recurso | Link |
 |--------|------|
@@ -22,7 +22,7 @@
 
 ---
 
-# 📖 Tabla de contenido
+## Tabla de contenido 📖
 - [Overview](#overview)
 - [Features](#features)
 - [Arquitectura](#arquitectura)
@@ -40,7 +40,7 @@
 
 ---
 
-# 🧐 Overview
+## Overview
 
 **Smart ID Authentication** es un sistema completo de verificación de identidad compuesto por:
 
@@ -55,39 +55,39 @@ Simula un flujo real como los usados en entidades financieras.
 
 ---
 
-# ✨ Features
+## Features
 
-### 🔍 OCR Inteligente
+### OCR Inteligente
 - Extrae nombres, apellidos, documento, expiración  
 - Calcula confianza del OCR  
 
-### 🧠 Liveness + Anti‑Spoofing
+### Liveness + Anti‑Spoofing
 Evalúa:
 - Nitidez  
 - Brillo  
 - Área del rostro  
 - Señales anti‑spoof  
 
-### 🧬 FaceMatch (FaceNet)
+### FaceMatch (FaceNet)
 - Embeddings de 512D  
 - Similaridad de coseno 0–1  
 - Tolerancia configurable  
 
-### 🔐 Motor de decisión
+### Motor de decisión
 Reglas:
 - Liveness ≥ 0.75  
 - FaceMatch ≥ 0.70  
 - OCR ≥ 0.60  
 - Documento válido  
 
-### ⚙ Arquitectura limpia
+### Arquitectura limpia
 - Servicios independientes  
 - Manejo de sesiones en memoria  
 - Estructura escalable  
 
 ---
 
-# 🏛 Arquitectura
+## Arquitectura
 
 ```
                    +-------------------------------+
@@ -108,7 +108,7 @@ Reglas:
 
 ---
 
-# 🔄 Flujo de Autenticación
+## Flujo de Autenticación
 
 ```
 Usuario
@@ -126,7 +126,7 @@ Resultado: APPROVED o REJECTED
 
 ---
 
-# 📦 Dependencias Principales
+## Dependencias Principales
 
 | Componente | Tecnologías |
 |-----------|-------------|
@@ -139,7 +139,7 @@ Resultado: APPROVED o REJECTED
 
 ---
 
-# 🗂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 smart-id-auth-backend/
@@ -158,7 +158,7 @@ smart-id-auth-backend/
 
 ---
 
-# 🌐 Endpoints
+## Endpoints
 
 ### POST `/v1/auth/session`
 Crea nueva sesión.
@@ -180,7 +180,7 @@ Evalúa el flujo y decide.
 
 ---
 
-# 🚀 Getting Started
+## Getting Started
 
 ```
 python -m venv .venv
@@ -196,7 +196,7 @@ http://localhost:8000/docs
 
 ---
 
-# 🧬 Detalles Técnicos
+## Detalles Técnicos
 
 ### OCR – EasyOCR
 Extrae texto y calcula confianza del reconocimiento.
@@ -222,7 +222,7 @@ else:
 
 ---
 
-# 📚 Dataset Usado o Referencia
+## Dataset Usado o Referencia
 
 No se usa dataset real por privacidad.
 
@@ -233,7 +233,7 @@ Referencias:
 
 ---
 
-# 🧪 Evidencias de Pruebas
+## Evidencias de Pruebas
 
 ✔ Colección Postman  
 ✔ Pruebas de flujo completo  
@@ -243,14 +243,14 @@ Referencias:
 
 ---
 
-# 🎥 Demo Funcional
+## Demo Funcional
 
 Video demostrativo:  
 https://drive.google.com/drive/folders/1TS9JKFt8h1AW9ZXBz8_BjH7PElMTSsG9
 
 ---
 
-# 🗺 Roadmap
+## Roadmap
 
 - [x] OCR  
 - [x] Liveness  
@@ -260,7 +260,7 @@ https://drive.google.com/drive/folders/1TS9JKFt8h1AW9ZXBz8_BjH7PElMTSsG9
 
 ---
 
-# 📄 Licencia
+## Licencia
 
 Proyecto académico de libre uso.
 
