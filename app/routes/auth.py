@@ -20,7 +20,7 @@ from app.services.decision_service import evaluate_authentication
 from app.helpers.image_helper import InvalidImageError
 from app.helpers.session_helper import SessionNotFoundError
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(prefix="/v1/auth", tags=["Authentication"])
 
 
 @router.post("/session", response_model=StartAuthResponse)
