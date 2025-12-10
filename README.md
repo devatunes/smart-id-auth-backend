@@ -1,168 +1,277 @@
+# Smart ID Authentication – OCR + Liveness + FaceMatch  
+*(FastAPI • EasyOCR • FaceNet • OpenCV • Pydantic • Anti‑Spoofing Heurístico)*
 
-<div id="top">
+---
 
-<!-- HEADER STYLE: CLASSIC -->
 <div align="center">
-
-<img src="readmeai/assets/logos/purple.svg" width="30%" alt="Project Logo"/>
-
-# <code>❯ Smart ID Authentication – OCR + Liveness + FaceMatch</code>
-
-<em>Sistema completo de autenticación basado en documento + selfie usando OCR, FaceNet y anti-spoof heurístico.</em>
-
 <img src="https://img.shields.io/badge/FastAPI-009688.svg?style=flat&logo=FastAPI&logoColor=white">
 <img src="https://img.shields.io/badge/EasyOCR-FFC107.svg?style=flat">
 <img src="https://img.shields.io/badge/FaceNet-4B7BEC.svg?style=flat">
-<img src="https://img.shields.io/badge/Python-3776AB.svg?style=flat&logo=Python&logoColor=white">
 <img src="https://img.shields.io/badge/OpenCV-5C3EE8.svg?style=flat&logo=opencv&logoColor=white">
+<img src="https://img.shields.io/badge/Python-3776AB.svg?style=flat&logo=Python&logoColor=white">
 <img src="https://img.shields.io/badge/Pydantic-E92063.svg?style=flat&logo=Pydantic&logoColor=white">
-
 </div>
 
 ---
 
-## Table of Contents
+## 📌 Enlaces importantes
+
+| Recurso | Link |
+|--------|------|
+| **Repositorio GitHub** | https://github.com/devatunes/smart-id-auth-backend |
+| **Documentación OAS (GitHub Pages)** | https://devatunes.github.io/smart-id-auth-backend/ |
+| **Colección de Postman** | https://documenter.getpostman.com/view/21541927/2sB3dQwAPQ |
+| **Demo funcional (video)** | https://drive.google.com/drive/folders/1TS9JKFt8h1AW9ZXBz8_BjH7PElMTSsG9 |
+
+---
+
+# 📖 Tabla de contenido
 - [Overview](#overview)
 - [Features](#features)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-    - [Project Index](#project-index)
+- [Arquitectura](#arquitectura)
+- [Flujo de Autenticación](#flujo-de-autenticación)
+- [Dependencias Principales](#dependencias-principales)
+- [Estructura del Proyecto](#estructura-del-proyecto)
 - [Endpoints](#endpoints)
 - [Getting Started](#getting-started)
-- [Technical Details](#technical-details)
-- [Examples](#examples)
+- [Detalles Técnicos](#detalles-técnicos)
+- [Dataset Usado o Referencia](#dataset-usado-o-referencia)
+- [Evidencias de Pruebas](#evidencias-de-pruebas)
+- [Demo Funcional](#demo-funcional)
 - [Roadmap](#roadmap)
-- [License](#license)
+- [Licencia](#licencia)
 
 ---
 
-## Overview
-Este proyecto implementa autenticación por documento + selfie mediante:
-- OCR con EasyOCR
-- Liveness heurístico + anti-spoof
-- Match facial con FaceNet (embeddings 512D)
-- Motor de decisión configurable
+# 🧐 Overview
+
+**Smart ID Authentication** es un sistema completo de verificación de identidad compuesto por:
+
+- OCR de documento (EasyOCR)
+- Extracción y comparación de rostro (FaceNet 512D)
+- Detección de rostro con MTCNN
+- Liveness heurístico + anti‑spoofing básico
+- Motor de decisión basado en umbrales configurables
+- API modular construida en FastAPI
+
+Simula un flujo real como los usados en entidades financieras.
 
 ---
 
-## Features
-- ✔ OCR
-- ✔ Liveness + anti-spoof
-- ✔ Face embeddings (FaceNet)
-- ✔ Cosine similarity normalizado
-- ✔ Validación completa del flujo
+# ✨ Features
 
----
+### 🔍 OCR Inteligente
+- Extrae nombres, apellidos, documento, expiración  
+- Calcula confianza del OCR  
 
-## Architecture
-```
-User
- ├── POST /auth/start
- ├── POST /auth/document
- ├── POST /auth/selfie
- └── POST /auth/decision
-```
+### 🧠 Liveness + Anti‑Spoofing
+Evalúa:
+- Nitidez  
+- Brillo  
+- Área del rostro  
+- Señales anti‑spoof  
 
----
+### 🧬 FaceMatch (FaceNet)
+- Embeddings de 512D  
+- Similaridad de coseno 0–1  
+- Tolerancia configurable  
 
-## Project Structure
-```
-app/
- ├── routes/
- ├── services/
- ├── helpers/
- ├── models/
- ├── repositories/
- └── main.py
-requirements.txt
-README.md
-```
-
----
-
-## Endpoints
-### **POST /auth/start**
-Crea una sesión de autenticación.
-
-### **POST /auth/document**
-Procesa documento, OCR, validación, extracción de rostro.
-
-### **POST /auth/selfie**
-Liveness + anti-spoof + embeddings.
-
-### **POST /auth/decision**
-Evalúa reglas:
-- liveness ≥ 0.75  
-- faceMatch ≥ 0.70  
+### 🔐 Motor de decisión
+Reglas:
+- Liveness ≥ 0.75  
+- FaceMatch ≥ 0.70  
 - OCR ≥ 0.60  
-- documento válido  
+- Documento válido  
+
+### ⚙ Arquitectura limpia
+- Servicios independientes  
+- Manejo de sesiones en memoria  
+- Estructura escalable  
 
 ---
 
-## Getting Started
-### Install
+# 🏛 Arquitectura
+
+```
+                   +-------------------------------+
+                   |           FastAPI             |
+                   |          (Backend)            |
+                   +-------------------------------+
+                     |       |           |       
+                     v       v           v
+               Document   Selfie     Decision Engine
+                Service   Service        Service
+                   |         |              |
+                   v         v              v
+         +------------+  +----------+  +----------------+
+         |   OCR      |  | Liveness |  | FaceNet Match |
+         | EasyOCR     | | AntiSpoof | | CosineSim      |
+         +------------+  +----------+  +----------------+
+```
+
+---
+
+# 🔄 Flujo de Autenticación
+
+```
+Usuario
+  |
+  |-- POST /v1/auth/session ------> crea sesión
+  |
+  |-- POST /v1/auth/document -----> OCR + validación + rostro documento
+  |
+  |-- POST /v1/auth/selfie --------> liveness + rostro selfie
+  |
+  |-- POST /v1/auth/decision ------> motor de decisión
+  |
+Resultado: APPROVED o REJECTED
+```
+
+---
+
+# 📦 Dependencias Principales
+
+| Componente | Tecnologías |
+|-----------|-------------|
+| OCR | EasyOCR, PyTorch |
+| Face Detection | MTCNN |
+| Embeddings | FaceNet |
+| Liveness | OpenCV |
+| API | FastAPI |
+| Modelado | Pydantic |
+
+---
+
+# 🗂 Estructura del Proyecto
+
+```
+smart-id-auth-backend/
+ ├── app/
+ │   ├── routes/
+ │   ├── services/
+ │   ├── helpers/
+ │   ├── models/
+ │   ├── repositories/
+ │   └── main.py
+ ├── docs/
+ │   └── openapi.json
+ ├── README.md
+ └── requirements.txt
+```
+
+---
+
+# 🌐 Endpoints
+
+### POST `/v1/auth/session`
+Crea nueva sesión.
+
+### POST `/v1/auth/document`
+Procesa:
+- OCR  
+- Validación  
+- Extracción de rostro  
+
+### POST `/v1/auth/selfie`
+Procesa:
+- Liveness  
+- Anti-spoof  
+- Embedding facial  
+
+### POST `/v1/auth/decision`
+Evalúa el flujo y decide.
+
+---
+
+# 🚀 Getting Started
+
 ```
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-### Run
-```
 uvicorn app.main:app --reload
 ```
 
+Swagger:
+```
+http://localhost:8000/docs
+```
+
 ---
 
-## Technical Details
+# 🧬 Detalles Técnicos
 
-### OCR
-EasyOCR extrae documento, nombres, apellidos, expiración.
+### OCR – EasyOCR
+Extrae texto y calcula confianza del reconocimiento.
+
+### FaceNet – Embeddings
+- 512 dimensiones  
+- Normalización L2  
+- Similaridad → (coseno + 1)/2  
 
 ### Liveness
-Se utilizan:
-- nitidez (Laplacian)
-- brillo
-- tamaño del rostro
+Heurísticas:
+- Varianza Laplaciana → nitidez  
+- Intensidad → brillo  
+- Proporción facial  
 
-### FaceMatch
-- MTCNN detecta rostro
-- FaceNet genera embedding 512D
-- Similitud de coseno normalizada a 0–1
-
----
-
-## Examples
-
-### Aprobado
-```json
-{
-  "status": "APPROVED",
-  "faceMatchScore": 0.82
-}
+### Motor de Decisión
 ```
-
-### Rechazado
-```json
-{
-  "status": "REJECTED",
-  "reason": "Face match score too low"
-}
+if doc_valid and ocr>=0.60 and live>=0.75 and match>=0.70:
+    APPROVED
+else:
+    REJECTED
 ```
 
 ---
 
-## Roadmap
-- [x] OCR
-- [x] Liveness
-- [x] FaceMatch
-- [ ] Anti-spoof CNN real
-- [ ] Docker
-- [ ] Tests
+# 📚 Dataset Usado o Referencia
+
+No se usa dataset real por privacidad.
+
+Referencias:
+- EasyOCR datasets  
+- VGGFace2 embeddings  
+- Imágenes locales controladas  
 
 ---
 
-## License
-MIT
+# 🧪 Evidencias de Pruebas
 
+✔ Colección Postman  
+✔ Pruebas de flujo completo  
+✔ Pruebas negativas  
+✔ Validación manual de excepciones  
+✔ Logs y resultados del motor de decisión  
+
+---
+
+# 🎥 Demo Funcional
+
+Video demostrativo:  
+https://drive.google.com/drive/folders/1TS9JKFt8h1AW9ZXBz8_BjH7PElMTSsG9
+
+---
+
+# 🗺 Roadmap
+
+- [x] OCR  
+- [x] Liveness  
+- [x] FaceMatch  
+- [x] Publicación OAS  
+- [ ] Anti-spoof CNN real  
+- [ ] Tests unitarios  
+- [ ] Docker  
+- [ ] Redis Sessions  
+
+---
+
+# 📄 Licencia
+
+Proyecto académico de libre uso.
+
+---
+
+<div align="right">
+<a href="#top">⬆ Volver arriba</a>
 </div>
