@@ -1,7 +1,4 @@
 # Smart ID Authentication – OCR + Liveness + FaceMatch  
-*(FastAPI • EasyOCR • FaceNet • OpenCV • Pydantic • Anti‑Spoofing Heurístico)*
-
----
 
 <div align="center">
 <img src="https://img.shields.io/badge/FastAPI-009688.svg?style=flat&logo=FastAPI&logoColor=white">
@@ -258,11 +255,8 @@ https://drive.google.com/drive/folders/1TS9JKFt8h1AW9ZXBz8_BjH7PElMTSsG9
 - [x] OCR  
 - [x] Liveness  
 - [x] FaceMatch  
-- [x] Publicación OAS  
-- [ ] Anti-spoof CNN real  
-- [ ] Tests unitarios  
-- [ ] Docker  
-- [ ] Redis Sessions  
+- [x] Tests unitarios  
+- [x] Docker  
 
 ---
 
