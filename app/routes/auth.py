@@ -118,16 +118,16 @@ def finalize_decision(sessionId: str):
         raise HTTPException(status_code=404, detail="Session not found")
 
 
-@router.get("/session-debug")
-def session_debug(sessionId: str):
-    """
-    Endpoint de apoyo para ver el estado crudo de una sesión.
-    (solo para debugging / demo).
-    """
-    session = get_session(sessionId)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session
+# @router.get("/session-debug")
+# def session_debug(sessionId: str):
+#     """
+#     Endpoint de apoyo para ver el estado crudo de una sesión.
+#     (solo para debugging / demo).
+#     """
+#     session = get_session(sessionId)
+#     if not session:
+#         raise HTTPException(status_code=404, detail="Session not found")
+#     return session
 
 
 # @router.get("/metrics", response_model=AuthMetrics)

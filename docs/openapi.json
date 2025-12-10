@@ -173,47 +173,6 @@
         }
       }
     },
-    "/v1/auth/session-debug": {
-      "get": {
-        "tags": [
-          "Authentication"
-        ],
-        "summary": "Session Debug",
-        "description": "Endpoint de apoyo para ver el estado crudo de una sesión.\n(solo para debugging / demo).",
-        "operationId": "session_debug_v1_auth_session_debug_get",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Sessionid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/health": {
       "get": {
         "summary": "Health",
